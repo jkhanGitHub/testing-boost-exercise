@@ -1,0 +1,63 @@
+name: C++ SideMade CI
+
+on:
+  push:
+    branches: [ main, extend-tests ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check formatting
+        run: |
+          clang-format --version
+          # Check src and tests directories
+          find src tests -name "*.cpp" -o -name "*.hpp" | xargs clang-format --dry-run -Werror
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libeigen3-dev libyaml-cpp-dev libboost-test-dev
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifact
+          path: build/
+          retention-days: 1
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifact
+          path: build
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libeigen3-dev libyaml-cpp-dev libboost-test-dev
+
+      - name: Run Tests
+        run: |
+          chmod +x build/testsidemade
+          ctest --test-dir build --output-on-failure
